@@ -1,12 +1,61 @@
-package ncs
+package ncs_test
 
 import (
+	"context"
 	"testing"
 
+	"github.com/ppalone/ncs"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNewClient(t *testing.T) {
-	c := NewClient(nil)
+	c := ncs.NewClient(nil)
 	assert.NotNil(t, c)
+}
+
+// TODO: add better tests
+func TestSearch(t *testing.T) {
+	t.Run("with search options", func(t *testing.T) {
+		c := ncs.NewClient(nil)
+
+		opts := make([]ncs.SearchOption, 0)
+		opts = append(opts, ncs.WithGenre(ncs.Dubstep))
+
+		res, err := c.Search(context.Background(), "", opts...)
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		assert.True(t, res.HasNext)
+		t.Log(len(res.Songs))
+
+		res1, err := res.Next(context.Background())
+		assert.NoError(t, err)
+		assert.NotNil(t, res1)
+		t.Log(len(res1.Songs))
+	})
+
+	t.Run("no next result", func(t *testing.T) {
+		c := ncs.NewClient(nil)
+
+		res, err := c.Search(context.Background(), "Alan Walker")
+		assert.NoError(t, err)
+		assert.NotEmpty(t, res.Songs)
+		assert.False(t, res.HasNext)
+
+		res1, err := res.Next(context.Background())
+		assert.Error(t, err)
+		assert.Empty(t, res1.Songs)
+	})
+
+	t.Run("no results", func(t *testing.T) {
+		c := ncs.NewClient(nil)
+
+		res, err := c.Search(
+			context.Background(),
+			"Alan Walker",
+			ncs.WithGenre(ncs.DrumBass),
+		)
+		assert.NoError(t, err)
+		assert.Empty(t, res.Songs)
+		assert.False(t, res.HasNext)
+	})
 }
