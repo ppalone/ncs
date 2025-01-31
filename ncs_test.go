@@ -59,3 +59,10 @@ func TestSearch(t *testing.T) {
 		assert.False(t, res.HasNext)
 	})
 }
+
+func TestReleases(t *testing.T) {
+	c := ncs.NewClient(nil)
+	res, err := c.Releases(context.TODO())
+	assert.NoError(t, err)
+	assert.NotEmpty(t, res.Songs)
+}

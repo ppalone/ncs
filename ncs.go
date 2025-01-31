@@ -48,6 +48,15 @@ func (c *Client) Search(ctx context.Context, q string, opts ...SearchOption) (Re
 	return c.search(ctx, q, filters)
 }
 
+// Releases returns the latest NCS releases
+func (c *Client) Releases(ctx context.Context) (Result, error) {
+	filters := defaultSearchOptions()
+	filters.page = 1
+
+	// releases is just normal music search without any search filters and query
+	return c.search(ctx, "", filters)
+}
+
 func makeRequest(ctx context.Context, method string, url string, params string) (*http.Request, error) {
 	req, err := http.NewRequestWithContext(ctx, method, url, nil)
 	if err != nil {
@@ -131,31 +140,12 @@ func (c *Client) search(ctx context.Context, q string, opts *searchOptions) (Res
 		song.Genre = info.AttrOr("data-genre", "")
 		song.Versions = strings.Split(info.AttrOr("data-versions", ""), ", ")
 
-		artists := make([]Artist, 0)
 		doc, err := goquery.NewDocumentFromReader(strings.NewReader(info.AttrOr("data-artist", "")))
 		if err != nil {
 			return
 		}
 
-		rows := doc.Find("a")
-		rows.Each(func(i int, s *goquery.Selection) {
-			u, ok := s.Attr("href")
-			if !ok {
-				return
-			}
-
-			t := strings.Split(u, "/")
-			if len(t) < 3 {
-				return
-			}
-
-			artists = append(artists, Artist{
-				Id:        t[2],
-				Name:      strings.TrimSpace(s.Text()),
-				ArtistURL: fmt.Sprintf("%s%s", baseURL, u),
-			})
-		})
-		song.Artists = artists
+		song.Artists = extractArtistsFromDocument(doc)
 
 		moods := make([]string, 0)
 		s.Find("td").Eq(4).Find("a").Each(func(i int, s *goquery.Selection) {
@@ -205,4 +195,29 @@ func (c *Client) search(ctx context.Context, q string, opts *searchOptions) (Res
 		Page:    opts.page,
 		HasNext: true,
 	}, nil
+}
+
+func extractArtistsFromDocument(doc *goquery.Document) []Artist {
+	artists := make([]Artist, 0)
+
+	rows := doc.Find("a")
+	rows.Each(func(i int, s *goquery.Selection) {
+		u, ok := s.Attr("href")
+		if !ok {
+			return
+		}
+
+		t := strings.Split(u, "/")
+		if len(t) < 3 {
+			return
+		}
+
+		artists = append(artists, Artist{
+			Id:        t[2],
+			Name:      strings.TrimSpace(s.Text()),
+			ArtistURL: fmt.Sprintf("%s%s", baseURL, u),
+		})
+	})
+
+	return artists
 }
