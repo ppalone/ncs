@@ -57,6 +57,58 @@ func (c *Client) Releases(ctx context.Context) (Result, error) {
 	return c.search(ctx, "", filters)
 }
 
+// GetSongById returns the song info by id
+func (c *Client) GetSongById(ctx context.Context, id string) (Song, error) {
+	id = strings.TrimSpace(id)
+	if len(id) == 0 {
+		return Song{}, fmt.Errorf("id cannot be empty")
+	}
+
+	req, err := makeRequest(ctx, http.MethodGet, fmt.Sprintf("%s/%s", baseURL, id), "")
+	if err != nil {
+		return Song{}, err
+	}
+
+	res, err := c.httpClient.Do(req)
+	if err != nil {
+		return Song{}, err
+	}
+	defer res.Body.Close()
+
+	doc, err := goquery.NewDocumentFromReader(res.Body)
+	if err != nil {
+		return Song{}, err
+	}
+
+	section := doc.Find(".player-nest")
+	if section.Length() == 0 {
+		return Song{}, fmt.Errorf("invalid id")
+	}
+
+	info := section.Find(".buttons a").First()
+	if info.Length() == 0 {
+		return Song{}, fmt.Errorf("unable to get song info")
+	}
+
+	song := Song{
+		Id:     id,
+		Title:  info.AttrOr("data-track", ""),
+		WebURL: fmt.Sprintf("%s/%s", baseURL, id),
+		Genre:  info.AttrOr("data-genre", ""),
+	}
+
+	song.MediaURL = section.Find("#player").First().AttrOr("data-url", "")
+	song.Artists = extractArtistsFromSelection(section.Find("h2 a"))
+
+	versions := make([]string, 0)
+	section.Find(".buttons a.btn").Each(func(i int, s *goquery.Selection) {
+		versions = append(versions, s.AttrOr("data-version", ""))
+	})
+	song.Versions = versions
+
+	return song, nil
+}
+
 func makeRequest(ctx context.Context, method string, url string, params string) (*http.Request, error) {
 	req, err := http.NewRequestWithContext(ctx, method, url, nil)
 	if err != nil {
@@ -145,7 +197,7 @@ func (c *Client) search(ctx context.Context, q string, opts *searchOptions) (Res
 			return
 		}
 
-		song.Artists = extractArtistsFromDocument(doc)
+		song.Artists = extractArtistsFromSelection(doc.Find("a"))
 
 		moods := make([]string, 0)
 		s.Find("td").Eq(4).Find("a").Each(func(i int, s *goquery.Selection) {
@@ -197,10 +249,9 @@ func (c *Client) search(ctx context.Context, q string, opts *searchOptions) (Res
 	}, nil
 }
 
-func extractArtistsFromDocument(doc *goquery.Document) []Artist {
+func extractArtistsFromSelection(rows *goquery.Selection) []Artist {
 	artists := make([]Artist, 0)
 
-	rows := doc.Find("a")
 	rows.Each(func(i int, s *goquery.Selection) {
 		u, ok := s.Attr("href")
 		if !ok {

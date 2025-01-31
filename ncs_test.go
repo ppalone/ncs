@@ -66,3 +66,22 @@ func TestReleases(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotEmpty(t, res.Songs)
 }
+
+func TestGetSongById(t *testing.T) {
+	t.Run("with invalid id", func(t *testing.T) {
+		c := ncs.NewClient(nil)
+
+		_, err := c.GetSongById(context.Background(), "DoesNotExist")
+		assert.ErrorContains(t, err, "invalid id")
+	})
+
+	t.Run("with valid id", func(t *testing.T) {
+		c := ncs.NewClient(nil)
+
+		song, err := c.GetSongById(context.Background(), "toburoots")
+		assert.NoError(t, err)
+		assert.Equal(t, "Roots", song.Title)
+		assert.Len(t, song.Artists, 1)
+		assert.Equal(t, "Tobu", song.Artists[0].Name)
+	})
+}
