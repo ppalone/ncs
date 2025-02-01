@@ -14,4 +14,5 @@ type Song struct {
 	Moods       []string
 	WebURL      string
 	ReleaseDate time.Time
+	Downloads   []Download
 }

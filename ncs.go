@@ -14,8 +14,9 @@ import (
 
 // constants
 const (
-	baseURL   string = "https://ncs.io"
-	searchURL string = "music-search"
+	baseURL     string = "https://ncs.io"
+	searchURL   string = "music-search"
+	downloadURL string = "track/download"
 )
 
 // NCS Client
@@ -101,10 +102,21 @@ func (c *Client) GetSongById(ctx context.Context, id string) (Song, error) {
 	song.Artists = extractArtistsFromSelection(section.Find("h2 a"))
 
 	versions := make([]string, 0)
+	downloads := make([]Download, 0)
 	section.Find(".buttons a.btn").Each(func(i int, s *goquery.Selection) {
-		versions = append(versions, s.AttrOr("data-version", ""))
+		v, ok := s.Attr("data-version")
+		if ok {
+			versions = append(versions, v)
+			if downloadURL, hasDownloadURL := s.Attr("href"); hasDownloadURL {
+				downloads = append(downloads, Download{
+					Version:     v,
+					DownloadURL: fmt.Sprintf("%s%s", baseURL, downloadURL),
+				})
+			}
+		}
 	})
 	song.Versions = versions
+	song.Downloads = downloads
 
 	return song, nil
 }
@@ -191,6 +203,24 @@ func (c *Client) search(ctx context.Context, q string, opts *searchOptions) (Res
 		song.CoverURL = info.AttrOr("data-cover", "")
 		song.Genre = info.AttrOr("data-genre", "")
 		song.Versions = strings.Split(info.AttrOr("data-versions", ""), ", ")
+
+		downloads := make([]Download, 0)
+		if id, ok := info.Attr("data-tid"); ok {
+			for _, v := range song.Versions {
+				if strings.EqualFold(v, string(Regular)) {
+					downloads = append(downloads, Download{
+						Version:     v,
+						DownloadURL: fmt.Sprintf("%s/%s/%s", baseURL, downloadURL, id),
+					})
+				} else if strings.EqualFold(v, string(Instrumental)) {
+					downloads = append(downloads, Download{
+						Version:     v,
+						DownloadURL: fmt.Sprintf("%s/%s/i_%s", baseURL, downloadURL, id),
+					})
+				}
+			}
+		}
+		song.Downloads = downloads
 
 		doc, err := goquery.NewDocumentFromReader(strings.NewReader(info.AttrOr("data-artist", "")))
 		if err != nil {

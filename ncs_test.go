@@ -83,5 +83,6 @@ func TestGetSongById(t *testing.T) {
 		assert.Equal(t, "Roots", song.Title)
 		assert.Len(t, song.Artists, 1)
 		assert.Equal(t, "Tobu", song.Artists[0].Name)
+		assert.NotEmpty(t, song.Downloads)
 	})
 }
