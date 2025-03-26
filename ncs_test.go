@@ -58,6 +58,31 @@ func TestSearch(t *testing.T) {
 		assert.Empty(t, res.Songs)
 		assert.False(t, res.HasNext)
 	})
+
+	t.Run("with page search option", func(t *testing.T) {
+		c := ncs.NewClient(nil)
+
+		res, err := c.Search(context.Background(), "")
+		assert.NoError(t, err)
+		assert.NotEmpty(t, res.Songs)
+		assert.True(t, res.HasNext)
+
+		nextRes, err := res.Next(context.Background())
+		assert.NoError(t, err)
+		assert.NotEmpty(t, nextRes.Songs)
+		assert.True(t, nextRes.HasNext)
+
+		opts := []ncs.SearchOption{
+			ncs.WithPage(res.Page + 1),
+		}
+		nextResWithPage, err := c.Search(context.Background(), "", opts...)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, nextResWithPage.Songs)
+		assert.True(t, nextResWithPage.HasNext)
+
+		// response from next & page both must match
+		assert.Equal(t, nextRes.Songs, nextResWithPage.Songs)
+	})
 }
 
 func TestReleases(t *testing.T) {

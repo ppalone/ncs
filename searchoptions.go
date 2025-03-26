@@ -13,7 +13,9 @@ type SearchOption func(opts *searchOptions)
 
 // Default search options
 func defaultSearchOptions() *searchOptions {
-	return &searchOptions{}
+	return &searchOptions{
+		page: 1,
+	}
 }
 
 // SearchOption with Genre
@@ -34,5 +36,12 @@ func WithMood(mood Mood) SearchOption {
 func WithVersion(version Version) SearchOption {
 	return func(opts *searchOptions) {
 		opts.version = version
+	}
+}
+
+// SearchOption with Page
+func WithPage(page int) SearchOption {
+	return func(opts *searchOptions) {
+		opts.page = page
 	}
 }
