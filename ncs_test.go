@@ -25,12 +25,10 @@ func TestSearch(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
 		assert.True(t, res.HasNext)
-		t.Log(len(res.Songs))
 
 		res1, err := res.Next(context.Background())
 		assert.NoError(t, err)
 		assert.NotNil(t, res1)
-		t.Log(len(res1.Songs))
 	})
 
 	t.Run("no next result", func(t *testing.T) {
