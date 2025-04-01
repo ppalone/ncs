@@ -6,3 +6,12 @@ type Artist struct {
 	Name      string
 	ArtistURL string
 }
+
+// ArtistInfo
+type ArtistInfo struct {
+	Id         string
+	Name       string
+	CoverImage string
+	Genres     []string
+	Songs      []Song
+}

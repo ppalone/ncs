@@ -17,6 +17,7 @@ const (
 	baseURL     string = "https://ncs.io"
 	searchURL   string = "music-search"
 	downloadURL string = "track/download"
+	artistURL   string = "artist/%s/example"
 )
 
 // NCS Client
@@ -120,6 +121,48 @@ func (c *Client) GetSongById(ctx context.Context, id string) (Song, error) {
 	return song, nil
 }
 
+// GetArtistInfoById returns the artist info by id
+func (c *Client) GetArtistInfoById(ctx context.Context, id string) (ArtistInfo, error) {
+	id = strings.TrimSpace(id)
+	if len(id) == 0 {
+		return ArtistInfo{}, fmt.Errorf("artist id cannot be empty")
+	}
+
+	url := fmt.Sprintf(artistURL, id)
+	req, err := makeRequest(ctx, http.MethodGet, fmt.Sprintf("%s/%s", baseURL, url), "")
+	if err != nil {
+		return ArtistInfo{}, err
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return ArtistInfo{}, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return ArtistInfo{}, fmt.Errorf("invalid id")
+	}
+
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		return ArtistInfo{}, err
+	}
+
+	info := doc.Find(".module.details")
+	if info.Length() == 0 {
+		return ArtistInfo{}, fmt.Errorf("unable to get artist info")
+	}
+
+	return ArtistInfo{
+		Id:         id,
+		Name:       info.Find(".info h5").Text(),
+		Genres:     strings.Split(info.Find(".info .tags").Text(), ", "),
+		CoverImage: extractBackgroundImage(info.Find(".img").AttrOr("style", "")),
+		Songs:      extractSongsFromSelection(doc.Find(".table table tbody tr")),
+	}, nil
+}
+
 func makeRequest(ctx context.Context, method string, url string, params string) (*http.Request, error) {
 	req, err := http.NewRequestWithContext(ctx, method, url, nil)
 	if err != nil {
@@ -174,6 +217,65 @@ func (c *Client) search(ctx context.Context, q string, opts *searchOptions) (Res
 		}, nil
 	}
 
+	songs := extractSongsFromSelection(rows)
+
+	pagination := doc.Find("ul.pagination")
+	if pagination.Length() == 0 {
+		return Result{
+			Size:    len(songs),
+			Songs:   songs,
+			Page:    opts.page,
+			HasNext: false,
+		}, nil
+	}
+
+	item := pagination.Find("li").Last()
+	if item.Length() == 0 || item.HasClass("disabled") {
+		return Result{
+			Size:    len(songs),
+			Songs:   songs,
+			Page:    opts.page,
+			HasNext: false,
+		}, nil
+	}
+
+	return Result{
+		c:    c,
+		q:    q,
+		opts: opts,
+
+		Size:    len(songs),
+		Songs:   songs,
+		Page:    opts.page,
+		HasNext: true,
+	}, nil
+}
+
+func extractArtistsFromSelection(rows *goquery.Selection) []Artist {
+	artists := make([]Artist, 0)
+
+	rows.Each(func(i int, s *goquery.Selection) {
+		u, ok := s.Attr("href")
+		if !ok {
+			return
+		}
+
+		t := strings.Split(u, "/")
+		if len(t) < 3 {
+			return
+		}
+
+		artists = append(artists, Artist{
+			Id:        t[2],
+			Name:      strings.TrimSpace(s.Text()),
+			ArtistURL: fmt.Sprintf("%s%s", baseURL, u),
+		})
+	})
+
+	return artists
+}
+
+func extractSongsFromSelection(rows *goquery.Selection) []Song {
 	songs := make([]Song, 0)
 	rows.Each(func(i int, s *goquery.Selection) {
 		var song Song
@@ -246,58 +348,24 @@ func (c *Client) search(ctx context.Context, q string, opts *searchOptions) (Res
 		songs = append(songs, song)
 	})
 
-	pagination := doc.Find("ul.pagination")
-	if pagination.Length() == 0 {
-		return Result{
-			Size:    len(songs),
-			Songs:   songs,
-			Page:    opts.page,
-			HasNext: false,
-		}, nil
-	}
-
-	item := pagination.Find("li").Last()
-	if item.Length() == 0 || item.HasClass("disabled") {
-		return Result{
-			Size:    len(songs),
-			Songs:   songs,
-			Page:    opts.page,
-			HasNext: false,
-		}, nil
-	}
-
-	return Result{
-		c:    c,
-		q:    q,
-		opts: opts,
-
-		Size:    len(songs),
-		Songs:   songs,
-		Page:    opts.page,
-		HasNext: true,
-	}, nil
+	return songs
 }
 
-func extractArtistsFromSelection(rows *goquery.Selection) []Artist {
-	artists := make([]Artist, 0)
+func extractBackgroundImage(s string) string {
+	t := strings.Split(s, "url(")
+	if len(t) < 2 {
+		return ""
+	}
 
-	rows.Each(func(i int, s *goquery.Selection) {
-		u, ok := s.Attr("href")
-		if !ok {
-			return
-		}
+	next := strings.Split(t[1], ")")
+	if len(next) < 2 {
+		return ""
+	}
 
-		t := strings.Split(u, "/")
-		if len(t) < 3 {
-			return
-		}
+	x := next[0]
+	if len(x) < 2 {
+		return ""
+	}
 
-		artists = append(artists, Artist{
-			Id:        t[2],
-			Name:      strings.TrimSpace(s.Text()),
-			ArtistURL: fmt.Sprintf("%s%s", baseURL, u),
-		})
-	})
-
-	return artists
+	return x[1 : len(x)-1]
 }
