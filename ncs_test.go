@@ -84,10 +84,47 @@ func TestSearch(t *testing.T) {
 }
 
 func TestReleases(t *testing.T) {
-	c := ncs.NewClient(nil)
-	res, err := c.Releases(context.TODO())
-	assert.NoError(t, err)
-	assert.NotEmpty(t, res.Songs)
+	t.Run("with no search options", func(t *testing.T) {
+		c := ncs.NewClient(nil)
+		res, err := c.Releases(context.TODO())
+		assert.NoError(t, err)
+		assert.NotEmpty(t, res.Songs)
+	})
+
+	t.Run("with page search option", func(t *testing.T) {
+		c := ncs.NewClient(nil)
+		res, err := c.Releases(context.Background())
+		assert.NoError(t, err)
+		assert.NotEmpty(t, res.Songs)
+		assert.True(t, res.HasNext)
+
+		nextRes, err := res.Next(context.Background())
+		assert.NoError(t, err)
+		assert.NotEmpty(t, nextRes.Songs)
+
+		opts := []ncs.SearchOption{
+			ncs.WithPage(res.Page + 1),
+		}
+		nextResWithPage, err := c.Releases(context.Background(), opts...)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, nextResWithPage.Songs)
+
+		assert.Equal(t, nextRes.Songs, nextResWithPage.Songs)
+	})
+
+	t.Run("with genre search option", func(t *testing.T) {
+		c := ncs.NewClient(nil)
+		opts := []ncs.SearchOption{
+			ncs.WithGenre(ncs.Dubstep),
+		}
+		res, err := c.Releases(context.Background(), opts...)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, res.Songs)
+
+		for _, s := range res.Songs {
+			assert.Contains(t, s.Genre, string(ncs.Dubstep))
+		}
+	})
 }
 
 func TestGetSongById(t *testing.T) {

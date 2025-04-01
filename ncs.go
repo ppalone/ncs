@@ -47,8 +47,11 @@ func (c *Client) Search(ctx context.Context, q string, opts ...SearchOption) (Re
 }
 
 // Releases returns the latest NCS releases
-func (c *Client) Releases(ctx context.Context) (Result, error) {
+func (c *Client) Releases(ctx context.Context, opts ...SearchOption) (Result, error) {
 	filters := defaultSearchOptions()
+	for _, opt := range opts {
+		opt(filters)
+	}
 
 	// releases is just normal music search without any search filters and query
 	return c.search(ctx, "", filters)
