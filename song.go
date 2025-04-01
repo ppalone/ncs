@@ -10,7 +10,7 @@ type Song struct {
 	MediaURL    string
 	Artists     []Artist
 	Versions    []string
-	Genre       string
+	Genres      []string
 	Moods       []string
 	WebURL      string
 	ReleaseDate time.Time

@@ -94,7 +94,7 @@ func (c *Client) GetSongById(ctx context.Context, id string) (Song, error) {
 		Id:     id,
 		Title:  info.AttrOr("data-track", ""),
 		WebURL: fmt.Sprintf("%s/%s", baseURL, id),
-		Genre:  info.AttrOr("data-genre", ""),
+		Genres: strings.Split(info.AttrOr("data-genre", ""), ", "),
 	}
 
 	song.MediaURL = section.Find("#player").First().AttrOr("data-url", "")
@@ -200,7 +200,7 @@ func (c *Client) search(ctx context.Context, q string, opts *searchOptions) (Res
 
 		song.MediaURL = info.AttrOr("data-url", "")
 		song.CoverURL = info.AttrOr("data-cover", "")
-		song.Genre = info.AttrOr("data-genre", "")
+		song.Genres = strings.Split(info.AttrOr("data-genre", ""), ", ")
 		song.Versions = strings.Split(info.AttrOr("data-versions", ""), ", ")
 
 		downloads := make([]Download, 0)

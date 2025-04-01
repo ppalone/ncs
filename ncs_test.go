@@ -122,7 +122,7 @@ func TestReleases(t *testing.T) {
 		assert.NotEmpty(t, res.Songs)
 
 		for _, s := range res.Songs {
-			assert.Contains(t, s.Genre, string(ncs.Dubstep))
+			assert.Contains(t, s.Genres, string(ncs.Dubstep))
 		}
 	})
 }
