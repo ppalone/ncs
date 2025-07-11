@@ -2,6 +2,12 @@
 
 Unofficial NCS (Nocopyrightsounds) Go client
 
+## Installation
+
+```bash
+go get github.com/ppalone/ncs
+```
+
 ## Usage
 
 Search song
