@@ -92,11 +92,35 @@ func (c *Client) GetSongById(ctx context.Context, id string) (Song, error) {
 		return Song{}, fmt.Errorf("unable to get song info")
 	}
 
+	// cover url
+	coverURL := ""
+
+	// check <meta property="og:image">
+	ogi := doc.Find("meta[property=\"og:image\"]").First()
+	if ogi.Length() > 0 {
+		coverURL = ogi.AttrOr("content", "")
+	} else {
+		// check <meta name="twitter:image">
+		twi := doc.Find("meta[name=\"twitter:image\"]").First()
+		if twi.Length() > 0 {
+			coverURL = twi.AttrOr("content", "")
+		}
+	}
+
+	if len(coverURL) == 0 {
+		return Song{}, fmt.Errorf("unable to get the cover url")
+	}
+
+	if strings.Contains(coverURL, "1000x0") {
+		coverURL = strings.ReplaceAll(coverURL, "1000x0", "100x100")
+	}
+
 	song := Song{
-		Id:     id,
-		Title:  info.AttrOr("data-track", ""),
-		WebURL: fmt.Sprintf("%s/%s", baseURL, id),
-		Genres: strings.Split(info.AttrOr("data-genre", ""), ", "),
+		Id:       id,
+		Title:    info.AttrOr("data-track", ""),
+		WebURL:   fmt.Sprintf("%s/%s", baseURL, id),
+		Genres:   strings.Split(info.AttrOr("data-genre", ""), ", "),
+		CoverURL: coverURL,
 	}
 
 	song.MediaURL = section.Find("#player").First().AttrOr("data-url", "")
