@@ -156,6 +156,8 @@ func TestGetArtistInfoById(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, "Tobu", info.Name)
 		assert.NotEmpty(t, info.Songs)
+		assert.NotEmpty(t, info.Genres)
+		assert.Contains(t, info.CoverImage, "https://")
 	})
 
 	t.Run("with invalid id", func(t *testing.T) {
@@ -163,5 +165,18 @@ func TestGetArtistInfoById(t *testing.T) {
 		c := ncs.NewClient(nil)
 		_, err := c.GetArtistInfoById(context.Background(), id)
 		assert.ErrorContains(t, err, "invalid id")
+	})
+
+	t.Run("with valid id but without cover image", func(t *testing.T) {
+		id := "1396" // rekz
+		c := ncs.NewClient(nil)
+		info, err := c.GetArtistInfoById(context.Background(), id)
+		assert.NoError(t, err)
+
+		assert.NotEmpty(t, info.Id)
+		assert.NotEmpty(t, info.Name)
+		assert.NotEmpty(t, info.Songs)
+		assert.NotEmpty(t, info.Genres)
+		assert.Contains(t, info.CoverImage, "https://")
 	})
 }

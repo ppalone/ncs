@@ -392,5 +392,10 @@ func extractBackgroundImage(s string) string {
 		return ""
 	}
 
-	return x[1 : len(x)-1]
+	img := x[1 : len(x)-1]
+	if !strings.HasPrefix(img, "https://") {
+		return fmt.Sprintf("%s%s", baseURL, img)
+	}
+
+	return img
 }
