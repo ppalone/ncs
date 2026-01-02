@@ -15,10 +15,11 @@ import (
 
 // constants
 const (
-	baseURL     string = "https://ncs.io"
-	searchURL   string = "music-search"
-	downloadURL string = "track/download"
-	artistURL   string = "artist/%s/example"
+	baseURL         string = "https://ncs.io"
+	searchURL       string = "music-search"
+	downloadURL     string = "track/download"
+	artistURL       string = "artist/%s/example"
+	searchArtistURL string = "artists"
 )
 
 // NCS Client
@@ -188,6 +189,17 @@ func (c *Client) GetArtistInfoById(ctx context.Context, id string) (ArtistInfo, 
 	}, nil
 }
 
+// SearchArtists
+func (c *Client) SearchArtists(ctx context.Context, q string, opts ...SearchArtistOption) (SearchArtistsResult, error) {
+	options := defaultSearchArtistOptions()
+
+	for _, opt := range opts {
+		opt(options)
+	}
+
+	return c.searchArtists(ctx, q, options)
+}
+
 func makeRequest(ctx context.Context, method string, url string, params string) (*http.Request, error) {
 	req, err := http.NewRequestWithContext(ctx, method, url, nil)
 	if err != nil {
@@ -272,6 +284,92 @@ func (c *Client) search(ctx context.Context, q string, opts *searchOptions) (Res
 		Size:    len(songs),
 		Songs:   songs,
 		Page:    opts.page,
+		HasNext: true,
+	}, nil
+}
+
+func (c *Client) searchArtists(ctx context.Context, q string, opts *searchArtistOptions) (SearchArtistsResult, error) {
+	// validate
+	if err := opts.validate(); err != nil {
+		return SearchArtistsResult{}, err
+	}
+
+	// search query
+	opts.q = strings.TrimSpace(q)
+
+	req, err := makeRequest(ctx, http.MethodGet, fmt.Sprintf("%s/%s", baseURL, searchArtistURL), opts.build())
+	if err != nil {
+		return SearchArtistsResult{}, err
+	}
+
+	res, err := c.httpClient.Do(req)
+	if err != nil {
+		return SearchArtistsResult{}, err
+	}
+	defer res.Body.Close()
+
+	doc, err := goquery.NewDocumentFromReader(res.Body)
+	if err != nil {
+		return SearchArtistsResult{}, err
+	}
+
+	cols := doc.Find(".artists .item")
+	if cols.Length() == 0 {
+		return SearchArtistsResult{
+			Size:    0,
+			Page:    opts.page,
+			Artists: make([]ArtistInfo, 0),
+			HasNext: false,
+		}, nil
+	}
+
+	artists := make([]ArtistInfo, 0)
+	cols.Each(func(i int, s *goquery.Selection) {
+		a, ok := s.Find("a").First().Attr("href")
+		if !ok {
+			return
+		}
+
+		t := strings.Split(a, "/")
+		if len(t) < 2 {
+			return
+		}
+
+		artists = append(artists, ArtistInfo{
+			Id:         t[2],
+			Name:       s.Find("strong").First().Text(),
+			CoverImage: extractBackgroundImage(s.Find(".img").First().AttrOr("style", "")),
+			Genres:     strings.Split(s.Find(".tags").First().Text(), ", "),
+		})
+	})
+
+	pagination := doc.Find("ul.pagination")
+	if pagination.Length() == 0 {
+		return SearchArtistsResult{
+			Size:    len(artists),
+			Page:    opts.page,
+			Artists: artists,
+			HasNext: false,
+		}, nil
+	}
+
+	item := pagination.Find("li").Last()
+	if item.Length() == 0 || item.HasClass("disabled") {
+		return SearchArtistsResult{
+			Size:    len(artists),
+			Page:    opts.page,
+			Artists: artists,
+			HasNext: false,
+		}, nil
+	}
+
+	return SearchArtistsResult{
+		c:       c,
+		q:       opts.q,
+		opts:    opts,
+		Size:    len(artists),
+		Page:    opts.page,
+		Artists: artists,
 		HasNext: true,
 	}, nil
 }

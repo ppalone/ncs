@@ -180,3 +180,65 @@ func TestGetArtistInfoById(t *testing.T) {
 		assert.Contains(t, info.CoverImage, "https://")
 	})
 }
+
+func Test_SearchArtists(t *testing.T) {
+	t.Run("with no options and no query", func(t *testing.T) {
+		c := ncs.NewClient(nil)
+		res, err := c.SearchArtists(context.Background(), "")
+		assert.NoError(t, err)
+		assert.True(t, res.HasNext)
+		assert.NotEmpty(t, res.Artists)
+		assert.Equal(t, 1, res.Page)
+	})
+
+	t.Run("with no options and search artist query", func(t *testing.T) {
+		c := ncs.NewClient(nil)
+		res, err := c.SearchArtists(context.Background(), "Tobu")
+		assert.NoError(t, err)
+		assert.False(t, res.HasNext)
+		assert.NotEmpty(t, res.Artists)
+		assert.Equal(t, 1, res.Page)
+	})
+
+	t.Run("with invalid year option", func(t *testing.T) {
+		c := ncs.NewClient(nil)
+		_, err := c.SearchArtists(context.Background(), "", ncs.WithYear(2001))
+		assert.Error(t, err)
+		assert.ErrorContains(t, err, "invalid year")
+	})
+
+	t.Run("with sort option AZ", func(t *testing.T) {
+		c := ncs.NewClient(nil)
+		res, err := c.SearchArtists(context.Background(), "", ncs.WithSort(ncs.AZ))
+		assert.NoError(t, err)
+		assert.True(t, res.HasNext)
+		assert.NotEmpty(t, res.Artists)
+		assert.Equal(t, 1, res.Page)
+	})
+
+	t.Run("with page option and next response", func(t *testing.T) {
+		c := ncs.NewClient(nil)
+		res, err := c.SearchArtists(context.Background(), "")
+		assert.NoError(t, err)
+		assert.True(t, res.HasNext)
+		assert.NotEmpty(t, res.Artists)
+		assert.Equal(t, 1, res.Page)
+
+		// next
+		resNext, err := res.Next(context.Background())
+		assert.NoError(t, err)
+		assert.NotEmpty(t, resNext.Artists)
+		assert.True(t, res.HasNext)
+		assert.Equal(t, 2, resNext.Page)
+
+		// with page
+		res2, err := c.SearchArtists(context.Background(), "", ncs.WithSearchArtistPage(2))
+		assert.NoError(t, err)
+		assert.True(t, res2.HasNext)
+		assert.NotEmpty(t, res2.Artists)
+		assert.Equal(t, 2, res2.Page)
+
+		// compare response, should match
+		assert.ElementsMatch(t, resNext.Artists, res2.Artists)
+	})
+}
